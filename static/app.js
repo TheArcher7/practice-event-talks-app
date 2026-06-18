@@ -714,8 +714,12 @@ function showToast(message, type = 'info') {
     
     // Animate out and remove toast after 3.5 seconds
     setTimeout(() => {
-        toast.style.animation = 'slideInRight 0.3s cubic-bezier(0.16, 1, 0.3, 1) reverse';
-        toast.addEventListener('animationend', () => toast.remove());
+        toast.style.transition = 'opacity 0.3s cubic-bezier(0.16, 1, 0.3, 1), transform 0.3s cubic-bezier(0.16, 1, 0.3, 1)';
+        toast.style.opacity = '0';
+        toast.style.transform = 'translateX(100%)';
+        setTimeout(() => {
+            toast.remove();
+        }, 300);
     }, 3500);
 }
 
