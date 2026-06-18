@@ -79,6 +79,7 @@ function initElements() {
     el.searchInput = document.getElementById('searchInput');
     el.clearSearchBtn = document.getElementById('clearSearchBtn');
     el.syncStatusText = document.getElementById('syncStatusText');
+    el.exportCsvBtn = document.getElementById('exportCsvBtn');
     
     // Sidebar Stats & Filters
     el.statTotalVal = document.getElementById('stat-total-val');
@@ -115,6 +116,11 @@ function setupEventListeners() {
     // Refresh handlers
     el.refreshBtn.addEventListener('click', () => fetchReleaseNotes());
     el.retryBtn.addEventListener('click', () => fetchReleaseNotes());
+    
+    // Export CSV handler
+    if (el.exportCsvBtn) {
+        el.exportCsvBtn.addEventListener('click', () => exportToCSV());
+    }
     
     // Search input
     el.searchInput.addEventListener('input', (e) => {
@@ -497,12 +503,12 @@ function createUpdateCard(up) {
     // Copy Text Button
     const copyTextBtn = document.createElement('button');
     copyTextBtn.className = 'action-icon-btn';
-    copyTextBtn.title = 'Copy description text';
+    copyTextBtn.title = 'Copy to clipboard';
     copyTextBtn.innerHTML = '<i data-lucide="copy"></i>';
     copyTextBtn.addEventListener('click', (e) => {
         e.stopPropagation();
         navigator.clipboard.writeText(`BigQuery ${up.type} (${up.date}): ${up.text}`)
-            .then(() => showToast('Copied description to clipboard!', 'info'))
+            .then(() => showToast('Copied to clipboard!', 'info'))
             .catch(() => showToast('Failed to copy text.', 'error'));
     });
     
@@ -725,4 +731,64 @@ function renderEmptyState() {
         </div>
     `;
     lucide.createIcons();
+}
+
+// Get currently filtered list of updates based on filter state and search query
+function getFilteredUpdates() {
+    let filtered = state.updates;
+    
+    // Category Filter
+    if (state.currentFilter !== 'all') {
+        filtered = filtered.filter(u => u.type.toLowerCase() === state.currentFilter.toLowerCase());
+    }
+    
+    // Keyword Search Filter
+    if (state.searchQuery) {
+        const query = state.searchQuery.toLowerCase();
+        filtered = filtered.filter(u => 
+            u.text.toLowerCase().includes(query) || 
+            u.type.toLowerCase().includes(query) || 
+            u.date.toLowerCase().includes(query)
+        );
+    }
+    
+    return filtered;
+}
+
+// Export the filtered release notes to a CSV file
+function exportToCSV() {
+    const filtered = getFilteredUpdates();
+    if (filtered.length === 0) {
+        showToast('No updates to export!', 'error');
+        return;
+    }
+    
+    const headers = ['Date', 'Category', 'Description', 'Link'];
+    const rows = filtered.map(u => [
+        u.date,
+        u.type,
+        u.text,
+        u.link
+    ]);
+    
+    const csvContent = [
+        headers.map(h => `"${h.replace(/"/g, '""')}"`).join(','),
+        ...rows.map(row => row.map(val => `"${(val || '').replace(/"/g, '""')}"`).join(','))
+    ].join('\n');
+    
+    const blob = new Blob([csvContent], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    
+    // File name formatting
+    const filterStr = state.currentFilter !== 'all' ? `_${state.currentFilter.toLowerCase()}` : '';
+    const dateStr = new Date().toISOString().split('T')[0];
+    link.setAttribute('href', url);
+    link.setAttribute('download', `bigquery_releases_${dateStr}${filterStr}.csv`);
+    link.style.visibility = 'hidden';
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+    
+    showToast(`Successfully exported ${filtered.length} updates to CSV!`, 'success');
 }
